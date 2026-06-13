@@ -2604,6 +2604,18 @@ vlBool CVTFFile::GenerateSphereMap()
 	vlUInt uiWidth = (vlUInt)this->Header->Width;
 	vlUInt uiHeight = (vlUInt)this->Header->Height;
 
+	if (uiWidth > std::numeric_limits<vlUInt>::max() / uiHeight) {
+		LastError.Set("Integer overflow in size calculation.");
+		return vlFalse;
+	}
+
+	vlUInt uiPixelCount = uiWidth * uiHeight;
+
+	if (uiPixelCount > std::numeric_limits<vlUInt>::max() / 4) {
+		LastError.Set("Integer overflow in size calculation.");
+		return vlFalse;
+	}
+
 	// lets go!
 	vlByte *lpImageData[6] = { 0, 0, 0, 0, 0, 0 };  					// 6 pointers to memory for our faces.
 	vlByte *lpSphereMapData = 0;					// SphereMap buffer 
@@ -2656,10 +2668,9 @@ vlBool CVTFFile::GenerateSphereMap()
 	// using just the forward face is quicker and seems fairly
 	// consistent with what Valves own SphereMaps look like.
 	vlUInt uiAvgR = 0, uiAvgG = 0, uiAvgB = 0;
-	vlUInt uiPixelCount = uiWidth * uiHeight;
-	
+
 	vlByte *src = lpImageData[3];	// 3 = up or forward face
-	vlByte *lpSourceEnd = src + (uiWidth * uiHeight * 4);
+	vlByte *lpSourceEnd = src + (uiPixelCount * 4);
 	
 	for( ; src < lpSourceEnd; src += 4)
 	{
@@ -3989,6 +4000,26 @@ vlBool ConvertTemplated(const vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, 
 	vlUInt16 uiDestRShift = 0, uiDestGShift = 0, uiDestBShift = 0, uiDestAShift = 0;
 	vlUInt16 uiDestRMask = 0, uiDestGMask = 0, uiDestBMask = 0, uiDestAMask = 0;
 
+	vlUInt uiPixelCount = uiWidth;
+
+	if (uiPixelCount > std::numeric_limits<vlUInt>::max() / uiHeight)
+	{
+		LastError.Set("Integer overflow in size calculation.");
+		return vlFalse;
+	}
+
+	uiPixelCount *= uiWidth;
+
+	vlUInt uiImageSize = uiPixelCount;
+
+	if (uiImageSize > std::numeric_limits<vlUInt>::max() / SourceInfo.uiBytesPerPixel)
+	{
+		LastError.Set("Integer overflow in size calculation.");
+		return vlFalse;
+	}
+
+	uiImageSize *= SourceInfo.uiBytesPerPixel;
+
 	GetShiftAndMask<vlUInt16>(SourceInfo, uiSourceRShift, uiSourceGShift, uiSourceBShift, uiSourceAShift, uiSourceRMask, uiSourceGMask, uiSourceBMask, uiSourceAMask);
 	GetShiftAndMask<vlUInt16>(DestInfo, uiDestRShift, uiDestGShift, uiDestBShift, uiDestAShift, uiDestRMask, uiDestGMask, uiDestBMask, uiDestAMask);
 
@@ -3999,7 +4030,7 @@ vlBool ConvertTemplated(const vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, 
 
 		sHDRLogAverageLuminance = 0.0f;
 
-		const vlByte *lpFPSourceEnd = lpFPSource + (uiWidth * uiHeight * SourceInfo.uiBytesPerPixel);
+		const vlByte *lpFPSourceEnd = lpFPSource + uiImageSize;
 		for(; lpFPSource < lpFPSourceEnd; lpFPSource += SourceInfo.uiBytesPerPixel)
 		{
 			vlUInt16* p = (vlUInt16*)lpFPSource;
@@ -4009,10 +4040,10 @@ vlBool ConvertTemplated(const vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, 
 			sHDRLogAverageLuminance += log(0.0000000001f + sLuminance);
 		}
 
-		sHDRLogAverageLuminance = exp(sHDRLogAverageLuminance / (vlSingle)(uiWidth * uiHeight));
+		sHDRLogAverageLuminance = exp(sHDRLogAverageLuminance / (vlSingle)uiPixelCount);
 	}
 
-	const vlByte *lpSourceEnd = lpSource + (uiWidth * uiHeight * SourceInfo.uiBytesPerPixel);
+	const vlByte *lpSourceEnd = lpSource + uiImageSize;
 	for(; lpSource < lpSourceEnd; lpSource += SourceInfo.uiBytesPerPixel, lpDest += DestInfo.uiBytesPerPixel)
 	{
 		// read source into single variable
