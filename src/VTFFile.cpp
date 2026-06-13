@@ -10,6 +10,8 @@
  */
 
 #include <string.h>
+#include <algorithm>
+#include <limits>
 
 #include "VTFLib.h"
 #include "VTFFile.h"
@@ -296,10 +298,10 @@ CVTFFile::CVTFFile(const CVTFFile &VTFFile, VTFImageFormat ImageFormat)
 			vlUInt uiMipmaps = VTFFile.GetMipmapCount();
 			vlUInt uiSlices = VTFFile.GetDepth();
 
-			this->uiImageBufferSize = this->ComputeImageSize(this->Header->Width, this->Header->Height, uiMipmaps, this->Header->ImageFormat) * uiFrames * uiFaces;
+			this->uiImageBufferSize = CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, uiMipmaps, this->Header->ImageFormat) * uiFrames * uiFaces;
 			this->lpImageData = new vlByte[this->uiImageBufferSize];
 
-			//vlByte *lpImageData = new vlByte[this->ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
+			//vlByte *lpImageData = new vlByte[CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
 
 			for(vlUInt i = 0; i < uiFrames; i++)
 			{
@@ -310,11 +312,11 @@ CVTFFile::CVTFFile(const CVTFFile &VTFFile, VTFImageFormat ImageFormat)
 						for(vlUInt l = 0; l < uiMipmaps; l++)
 						{
 							vlUInt uiMipmapWidth, uiMipmapHeight, uiMipmapDepth;
-							this->ComputeMipmapDimensions(this->Header->Width, this->Header->Height, 1, l, uiMipmapWidth, uiMipmapHeight, uiMipmapDepth);
+							CVTFFile::ComputeMipmapDimensions(this->Header->Width, this->Header->Height, 1, l, uiMipmapWidth, uiMipmapHeight, uiMipmapDepth);
 
 							//this->ConvertToRGBA8888(VTFFile.GetData(i, j, k, l), lpImageData, uiMipmapWidth, uiMipmapHeight, VTFFile.GetFormat());
 							//this->ConvertFromRGBA8888(lpImageData, this->GetData(i, j, k, l), uiMipmapWidth, uiMipmapHeight, this->GetFormat());
-							this->Convert(VTFFile.GetData(i, j, k, l), this->GetData(i, j, k, l), uiMipmapWidth, uiMipmapHeight, VTFFile.GetFormat(), this->GetFormat());
+							CVTFFile::Convert(VTFFile.GetData(i, j, k, l), this->GetData(i, j, k, l), uiMipmapWidth, uiMipmapHeight, VTFFile.GetFormat(), this->GetFormat());
 						}
 					}
 				}
@@ -505,7 +507,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 		this->Header->LowResImageWidth = (vlByte)uiThumbnailWidth;
 		this->Header->LowResImageHeight = (vlByte)uiThumbnailHeight;
 
-		this->uiThumbnailBufferSize = this->ComputeImageSize(this->Header->LowResImageWidth, this->Header->LowResImageHeight, 1, this->Header->LowResImageFormat);
+		this->uiThumbnailBufferSize = CVTFFile::ComputeImageSize(this->Header->LowResImageWidth, this->Header->LowResImageHeight, 1, this->Header->LowResImageFormat);
 		this->lpThumbnailImageData = new vlByte[this->uiThumbnailBufferSize];
 
 		this->Header->Resources[this->Header->ResourceCount++].Type = VTF_LEGACY_RSRC_LOW_RES_IMAGE;
@@ -524,7 +526,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 	// Generate image.
 	//
 
-	this->uiImageBufferSize = this->ComputeImageSize(this->Header->Width, this->Header->Height, this->Header->Depth, this->Header->MipCount, this->Header->ImageFormat) * uiFrames * uiFaces;
+	this->uiImageBufferSize = CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, this->Header->Depth, this->Header->MipCount, this->Header->ImageFormat) * uiFrames * uiFaces;
 	this->lpImageData = new vlByte[this->uiImageBufferSize];
 
 	this->Header->Resources[this->Header->ResourceCount++].Type = VTF_LEGACY_RSRC_IMAGE;
@@ -700,7 +702,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 
 				for(vlUInt i = 0; i < uiCount; i++)
 				{
-					lpNewImageDataRGBA8888[i] = new vlByte[this->ComputeImageSize(uiNewWidth, uiNewHeight, 1, IMAGE_FORMAT_RGBA8888)];
+					lpNewImageDataRGBA8888[i] = new vlByte[CVTFFile::ComputeImageSize(uiNewWidth, uiNewHeight, 1, IMAGE_FORMAT_RGBA8888)];
 
 					if(!this->Resize(lpImageDataRGBA8888[i], lpNewImageDataRGBA8888[i], uiWidth, uiHeight, uiNewWidth, uiNewHeight, VTFCreateOptions.ResizeFilter, VTFCreateOptions.ResizeSharpenFilter))
 					{
@@ -760,7 +762,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 
 			// Note: used to use a destination buffer, now just modifies the input data.
 
-			//vlByte *lpImageDataNormalMap = new vlByte[this->ComputeImageSize(this->Header->Width, this->Header->Height, IMAGE_FORMAT_RGBA8888)];
+			//vlByte *lpImageDataNormalMap = new vlByte[CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, IMAGE_FORMAT_RGBA8888)];
 
 			for(vlUInt i = 0; i < uiFrames; i++)
 			{
@@ -1019,7 +1021,8 @@ vlVoid CVTFFile::Destroy()
 {
 	if(this->Header != 0)
 	{
-		for(vlUInt i = 0; i < this->Header->ResourceCount; i++)
+		vlUInt n = std::min((vlUInt)VTF_RSRC_MAX_DICTIONARY_ENTRIES, this->Header->ResourceCount);
+		for(vlUInt i = 0; i < n; i++)
 		{
 			delete []this->Header->Data[i].Data;
 		}
@@ -1202,11 +1205,11 @@ vlBool CVTFFile::Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly)
 		}
 
 		// work out how big out buffers need to be
-		this->uiImageBufferSize = this->ComputeImageSize(this->Header->Width, this->Header->Height, this->Header->Depth, this->Header->MipCount, this->Header->ImageFormat) * this->GetFaceCount() * this->GetFrameCount();
+		this->uiImageBufferSize = CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, this->Header->Depth, this->Header->MipCount, this->Header->ImageFormat) * this->GetFaceCount() * this->GetFrameCount();
 
 		if(this->Header->LowResImageFormat != IMAGE_FORMAT_NONE)
 		{
-			this->uiThumbnailBufferSize = this->ComputeImageSize(this->Header->LowResImageWidth, this->Header->LowResImageHeight, 1, this->Header->LowResImageFormat);
+			this->uiThumbnailBufferSize = CVTFFile::ComputeImageSize(this->Header->LowResImageWidth, this->Header->LowResImageHeight, 1, this->Header->LowResImageFormat);
 		}
 		else
 		{
@@ -2348,7 +2351,7 @@ vlBool CVTFFile::GenerateMipmaps(vlUInt uiFace, vlUInt uiFrame, VTFMipmapFilter 
 	// The UserData struct gets passed to our callback.
 	Options.user_data = &UserData;
 
-	vlByte *lpImageData = new vlByte[this->ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
+	vlByte *lpImageData = new vlByte[CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
 	
 	if(!this->ConvertToRGBA8888(this->GetData(uiFace, uiFrame, 0, 0), lpImageData, this->Header->Width, this->Header->Height, this->Header->ImageFormat))
 	{
@@ -2505,7 +2508,7 @@ vlBool CVTFFile::GenerateNormalMap(vlUInt uiFrame, VTFKernelFilter KernelFilter,
 	vlByte *lpData = this->GetData(0, uiFrame, 0, 0);
 
 	// Will hold frame's converted image data.
-	vlByte *lpSource = new vlByte[this->ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
+	vlByte *lpSource = new vlByte[CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
 
 	// Get the frame's image data.
 	if(!this->ConvertToRGBA8888(lpData, lpSource, this->Header->Width, this->Header->Height, this->Header->ImageFormat))
@@ -2516,7 +2519,7 @@ vlBool CVTFFile::GenerateNormalMap(vlUInt uiFrame, VTFKernelFilter KernelFilter,
 	}
 
 	// Will hold normal image data.
-	//vlByte *lpDest = new vlByte[this->ComputeImageSize(this->Header->Width, this->Header->Height, IMAGE_FORMAT_RGBA8888)];
+	//vlByte *lpDest = new vlByte[CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, IMAGE_FORMAT_RGBA8888)];
 
 	// Convert it to a normal map.
 	if(!this->ConvertToNormalMap(lpSource, 0/*lpDest*/, this->Header->Width, this->Header->Height, KernelFilter, HeightConversionMethod, NormalAlphaResult))
@@ -2617,7 +2620,7 @@ vlBool CVTFFile::GenerateSphereMap()
 	{ 
 		vlUInt j = map[i];		// Valve face order to my face order map.
 
-		lpImageData[j] = new vlByte[this->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888)]; 
+		lpImageData[j] = new vlByte[CVTFFile::ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888)]; 
 		
 		if(!this->ConvertToRGBA8888(this->GetData(0, i, 0, 0), lpImageData[j], uiWidth, uiHeight, this->Header->ImageFormat)) 
 		{ 
@@ -2631,7 +2634,7 @@ vlBool CVTFFile::GenerateSphereMap()
 	}
 
 	// Assuming at this point our faces have loaded fine, create a buffer for the SphereMap
-	lpSphereMapData = new vlByte[this->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888)]; 
+	lpSphereMapData = new vlByte[CVTFFile::ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888)]; 
 
 	// At this point we need to flip 4 of the faces as follows as their "Valve" orientation
 	// is different to what the SphereMap rendering code needs.
@@ -2796,7 +2799,7 @@ vlBool CVTFFile::ComputeReflectivity()
 	this->Header->Reflectivity[1] = 0.0f;
 	this->Header->Reflectivity[2] = 0.0f;
 
-    vlByte *lpImageData = new vlByte[this->ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
+    vlByte *lpImageData = new vlByte[CVTFFile::ComputeImageSize(this->Header->Width, this->Header->Height, 1, IMAGE_FORMAT_RGBA8888)];
 
 	vlUInt uiFrameCount = this->GetFrameCount();
 	vlUInt uiFaceCount = this->GetFaceCount();
@@ -2913,6 +2916,50 @@ SVTFImageFormatInfo const &CVTFFile::GetImageFormatInfo(VTFImageFormat ImageForm
 //------------------------------------------------------------------------------------
 vlUInt CVTFFile::ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDepth, VTFImageFormat ImageFormat)
 {
+	if (uiWidth > VTF_HDR_MAX_WIDTH)
+	{
+		LastError.SetFormatted("image width is too big: %u > %u", uiWidth, VTF_HDR_MAX_WIDTH);
+		throw 0;
+	}
+
+	if (uiHeight > VTF_HDR_MAX_HEIGHT)
+	{
+		LastError.SetFormatted("image height is too big: %u > %u", uiHeight, VTF_HDR_MAX_HEIGHT);
+		throw 0;
+	}
+
+	if (uiDepth > VTF_HDR_MAX_DEPTH)
+	{
+		LastError.SetFormatted("image depth is too big: %u > %u", uiDepth, VTF_HDR_MAX_DEPTH);
+		throw 0;
+	}
+
+	vlUInt uiByteWidth = uiWidth;
+	vlUInt uiByteHeight = uiHeight;
+	vlUInt uiBytesPerPixel = 0;
+
+	switch(ImageFormat)
+	{
+	case IMAGE_FORMAT_DXT1:
+	case IMAGE_FORMAT_DXT3:
+	case IMAGE_FORMAT_DXT5:
+		if (uiWidth % 4 != 0)
+		{
+			LastError.SetFormatted("Width for DXT compressed texture is not a multiple of 4: %u", uiWidth);
+			throw 0;
+		}
+
+		if (uiHeight % 4 != 0)
+		{
+			LastError.SetFormatted("Height for DXT compressed texture is not a multiple of 4: %u", uiHeight);
+			throw 0;
+		}
+		break;
+
+	default:
+		break;
+	}
+
 	switch(ImageFormat)
 	{
 	case IMAGE_FORMAT_DXT1:
@@ -2923,7 +2970,11 @@ vlUInt CVTFFile::ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDept
 		if(uiHeight < 4 && uiHeight > 0)
 			uiHeight = 4;
 
-		return ((uiWidth + 3) / 4) * ((uiHeight + 3) / 4) * 8 * uiDepth;
+		uiByteWidth = ((uiWidth + 3) / 4);
+		uiByteHeight = ((uiHeight + 3) / 4);
+		uiBytesPerPixel = 8;
+		break;
+
 	case IMAGE_FORMAT_DXT3:
 	case IMAGE_FORMAT_DXT5:
 		if(uiWidth < 4 && uiWidth > 0)
@@ -2932,10 +2983,43 @@ vlUInt CVTFFile::ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDept
 		if(uiHeight < 4 && uiHeight > 0)
 			uiHeight = 4;
 
-		return ((uiWidth + 3) / 4) * ((uiHeight + 3) / 4) * 16 * uiDepth;
+		uiByteWidth = ((uiWidth + 3) / 4);
+		uiByteHeight = ((uiHeight + 3) / 4);
+		uiBytesPerPixel = 16;
+		break;
+
 	default:
-		return uiWidth * uiHeight * uiDepth * CVTFFile::GetImageFormatInfo(ImageFormat).uiBytesPerPixel;
+		uiBytesPerPixel = CVTFFile::GetImageFormatInfo(ImageFormat).uiBytesPerPixel;
+		break;
 	}
+
+	vlUInt size = uiByteWidth;
+
+	if (size > std::numeric_limits<vlUInt>::max() / uiByteHeight)
+	{
+		LastError.Set("Integer overflow while calculating image size");
+		throw 0;
+	}
+
+	size *= uiByteHeight;
+
+	if (size > std::numeric_limits<vlUInt>::max() / uiDepth)
+	{
+		LastError.Set("Integer overflow while calculating image size");
+		throw 0;
+	}
+
+	size *= uiDepth;
+
+	if (size > std::numeric_limits<vlUInt>::max() / uiBytesPerPixel)
+	{
+		LastError.Set("Integer overflow while calculating image size");
+		throw 0;
+	}
+
+	size *= uiBytesPerPixel;
+
+	return size;
 }
 
 //
@@ -2951,7 +3035,15 @@ vlUInt CVTFFile::ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDept
 
 	for(vlUInt i = 0; i < uiMipmaps; i++)
 	{
-		uiImageSize += CVTFFile::ComputeImageSize(uiWidth, uiHeight, uiDepth, ImageFormat);
+		vlUInt uiMipmapSize = CVTFFile::ComputeImageSize(uiWidth, uiHeight, uiDepth, ImageFormat);
+
+		if (uiImageSize > std::numeric_limits<vlUInt>::max() - uiMipmapSize)
+		{
+			LastError.Set("Integer overflow while calculating image size");
+			throw 0;
+		}
+
+		uiImageSize += uiMipmapSize;
 		
 		uiWidth >>= 1;
 		uiHeight >>= 1;
@@ -3084,11 +3176,11 @@ vlUInt CVTFFile::ComputeDataOffset(vlUInt uiFrame, vlUInt uiFace, vlUInt uiSlice
 	// Transverse past all frames and faces of each mipmap (up to the requested one).
 	for(vlInt i = (vlInt)uiMipCount - 1; i > (vlInt)uiMipLevel; i--)
 	{
-		uiOffset += this->ComputeMipmapSize(this->Header->Width, this->Header->Height, this->Header->Depth, i, ImageFormat) * uiFrameCount * uiFaceCount;
+		uiOffset += CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, this->Header->Depth, i, ImageFormat) * uiFrameCount * uiFaceCount;
 	}
 
-	vlUInt uiTemp1 = this->ComputeMipmapSize(this->Header->Width, this->Header->Height, this->Header->Depth, uiMipLevel, ImageFormat);
-	vlUInt uiTemp2 = this->ComputeMipmapSize(this->Header->Width, this->Header->Height, 1, uiMipLevel, ImageFormat);
+	vlUInt uiTemp1 = CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, this->Header->Depth, uiMipLevel, ImageFormat);
+	vlUInt uiTemp2 = CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, 1, uiMipLevel, ImageFormat);
 
 	// Transverse past requested frames and faces of requested mipmap.
 	uiOffset += uiTemp1 * uiFrame * uiFaceCount * uiSliceCount;
@@ -3123,6 +3215,15 @@ vlBool CVTFFile::ConvertToRGBA8888(const vlByte *lpSource, vlByte *lpDest, vlUIn
 //-----------------------------------------------------------------------------------------------------
 vlBool CVTFFile::DecompressDXT1(const vlByte *src, vlByte *dst, vlUInt uiWidth, vlUInt uiHeight)
 {
+	if (uiWidth % 4 != 0) {
+		LastError.SetFormatted("Width for DXT1 compressed texture is not a multiple of 4: %u", uiWidth);
+		return vlFalse;
+	}
+
+	if (uiHeight % 4 != 0) {
+		LastError.SetFormatted("Height for DXT1 compressed texture is not a multiple of 4: %u", uiHeight);
+		return vlFalse;
+	}
 	vlUInt			x, y, i, j, k, Select;
 	const vlByte	*Temp;
 	Colour565		*color_0, *color_1;
@@ -3218,6 +3319,18 @@ vlBool CVTFFile::DecompressDXT1(const vlByte *src, vlByte *dst, vlUInt uiWidth, 
 //-----------------------------------------------------------------------------------------------------
 vlBool CVTFFile::DecompressDXT3(const vlByte *src, vlByte *dst, vlUInt uiWidth, vlUInt uiHeight)
 {
+	if (uiWidth % 4 != 0)
+	{
+		LastError.SetFormatted("Width for DXT3 compressed texture is not a multiple of 4: %u", uiWidth);
+		return vlFalse;
+	}
+
+	if (uiHeight % 4 != 0)
+	{
+		LastError.SetFormatted("Height for DXT3 compressed texture is not a multiple of 4: %u", uiHeight);
+		return vlFalse;
+	}
+
 	vlUInt			x, y, i, j, k, Select;
 	const vlByte	*Temp;
 	Colour565		*color_0, *color_1;
@@ -3313,6 +3426,18 @@ vlBool CVTFFile::DecompressDXT3(const vlByte *src, vlByte *dst, vlUInt uiWidth, 
 //-----------------------------------------------------------------------------------------------------
 vlBool CVTFFile::DecompressDXT5(const vlByte *src, vlByte *dst, vlUInt uiWidth, vlUInt uiHeight)
 {
+	if (uiWidth % 4 != 0)
+	{
+		LastError.SetFormatted("Width for DXT5 compressed texture is not a multiple of 4: %u", uiWidth);
+		return vlFalse;
+	}
+
+	if (uiHeight % 4 != 0)
+	{
+		LastError.SetFormatted("Height for DXT5 compressed texture is not a multiple of 4: %u", uiHeight);
+		return vlFalse;
+	}
+
 	vlUInt			x, y, i, j, k, Select;
 	const vlByte	*Temp, *alphamask;
 	Colour565		*color_0, *color_1;
