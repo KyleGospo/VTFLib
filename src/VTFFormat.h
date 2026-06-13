@@ -365,6 +365,14 @@ struct SVTFHeader_70 : public SVTFFileHeader
 	vlByte			LowResImageHeight;				//!< Thumbnail image height
 };
 
+enum {
+	// Reasonable large numbers that don't immediately overflow a vlUShort
+	// if you add a small number.
+	VTF_HDR_MAX_WIDTH  = 0x7FFF,
+	VTF_HDR_MAX_HEIGHT = 0x7FFF,
+	VTF_HDR_MAX_DEPTH  = 0x7FFF,
+};
+
 //! VTFHeader_70_A struct.
 /*!
 
