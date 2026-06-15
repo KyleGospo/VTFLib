@@ -3164,6 +3164,13 @@ vlUInt CVTFFile::ComputeDataOffset(vlUInt uiFrame, vlUInt uiFace, vlUInt uiSlice
 	vlUInt uiSliceCount = this->GetDepth();
 	vlUInt uiMipCount = this->GetMipmapCount();
 
+	if (uiFrameCount == 0 || uiFaceCount == 0 || uiSliceCount == 0 || uiMipCount == 0)
+	{
+		// underflow prevention
+		LastError.Set("Integer underflow in data offset calculation.");
+		throw 0;
+	}
+
 	if(uiFrame >= uiFrameCount)
 	{
 		uiFrame = uiFrameCount - 1;
@@ -3184,19 +3191,99 @@ vlUInt CVTFFile::ComputeDataOffset(vlUInt uiFrame, vlUInt uiFace, vlUInt uiSlice
 		uiMipLevel = uiMipCount - 1;
 	}
 
+	if (uiFrameCount > std::numeric_limits<vlUInt>::max() / uiFaceCount)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
+	vlUInt uiFrameCountFaceCount = uiFrameCount * uiFaceCount;
+
 	// Transverse past all frames and faces of each mipmap (up to the requested one).
 	for(vlInt i = (vlInt)uiMipCount - 1; i > (vlInt)uiMipLevel; i--)
 	{
-		uiOffset += CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, this->Header->Depth, i, ImageFormat) * uiFrameCount * uiFaceCount;
+		vlUInt uiRelativeOffset = CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, this->Header->Depth, i, ImageFormat);
+
+		if (uiRelativeOffset > std::numeric_limits<vlUInt>::max() / uiFrameCountFaceCount)
+		{
+			LastError.Set("Integer overflow in data offset calculation.");
+			throw 0;
+		}
+
+		uiRelativeOffset *= uiFrameCountFaceCount;
+
+		if (uiOffset > std::numeric_limits<vlUInt>::max() - uiRelativeOffset)
+		{
+			LastError.Set("Integer overflow in data offset calculation.");
+			throw 0;
+		}
+
+		uiOffset += uiRelativeOffset;
 	}
 
 	vlUInt uiTemp1 = CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, this->Header->Depth, uiMipLevel, ImageFormat);
 	vlUInt uiTemp2 = CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, 1, uiMipLevel, ImageFormat);
 
+	if (uiTemp1 > std::numeric_limits<vlUInt>::max() / uiSliceCount)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
 	// Transverse past requested frames and faces of requested mipmap.
-	uiOffset += uiTemp1 * uiFrame * uiFaceCount * uiSliceCount;
-	uiOffset += uiTemp1 * uiFace * uiSliceCount;
-	uiOffset += uiTemp2 * uiSlice;
+	vlUInt uiTemp1SliceCount = uiTemp1 * uiSliceCount;
+
+	// Can't overlfow because uiFrame is < uiFrameCount and
+	// uiFrameCount * uiFaceCount is already checked above.
+	vlUInt uiFrameFaceCount = uiFrame * uiFaceCount;
+
+	if (uiTemp1SliceCount > std::numeric_limits<vlUInt>::max() / uiFrameFaceCount)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
+	vlUInt uiRelativeOffset = uiTemp1SliceCount * uiFrameFaceCount;
+
+	if (uiOffset > std::numeric_limits<vlUInt>::max() - uiRelativeOffset)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
+	uiOffset += uiRelativeOffset;
+
+	if (uiTemp1SliceCount > std::numeric_limits<vlUInt>::max() / uiFace)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
+	uiRelativeOffset = uiTemp1SliceCount * uiFace;
+
+	if (uiOffset > std::numeric_limits<vlUInt>::max() - uiRelativeOffset)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
+	uiOffset += uiRelativeOffset;
+
+	if (uiTemp2 > std::numeric_limits<vlUInt>::max() / uiSlice)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
+	uiRelativeOffset = uiTemp2 * uiSlice;
+
+	if (uiOffset > std::numeric_limits<vlUInt>::max() - uiRelativeOffset)
+	{
+		LastError.Set("Integer overflow in data offset calculation.");
+		throw 0;
+	}
+
+	uiOffset += uiRelativeOffset;
 
 	assert(uiOffset < this->uiImageBufferSize);
 	
@@ -4008,7 +4095,7 @@ vlBool ConvertTemplated(const vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, 
 		return vlFalse;
 	}
 
-	uiPixelCount *= uiWidth;
+	uiPixelCount *= uiHeight;
 
 	vlUInt uiImageSize = uiPixelCount;
 
