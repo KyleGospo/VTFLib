@@ -4008,7 +4008,7 @@ vlBool ConvertTemplated(const vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, 
 		return vlFalse;
 	}
 
-	uiPixelCount *= uiWidth;
+	uiPixelCount *= uiHeight;
 
 	vlUInt uiImageSize = uiPixelCount;
 
