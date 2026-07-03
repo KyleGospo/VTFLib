@@ -3,6 +3,36 @@ VTFLib
 
 This is a Linux port of [VTFLib](http://nemesis.thewavelength.net/index.php?c=149).
 
+> [!NOTE]
+> I never studied the source of the original VTFLib, never pulled changes from
+> upstream, and never really maintained this library.
+>
+> I only ported this library to Linux so I could look at the textures of Portal 2
+> out of curiosity.
+
+> [!WARNING]
+> This library is written in a pretty unsafe way and might have buffer overflows
+> related to its file parsing logic (or other places). In fact there is a read
+> buffer overlow in `CVTFFile::Convert()` (as I was told by someone using ASAN),
+> but I don't understand the code well enough to figure out what is going on.
+>
+> Only use this library with files that you *really* trust!
+>
+> It is also not endian safe. Meaning it only supports little-endian platforms
+> and using it on a big-endian platform will not work at all and lead to crashes.
+
+I was notified about several problems:
+
+* Integer overflows in size calculations that then lead to write buffer overflows
+  to undersized buffers.
+* Wrong buffer size assumptions leading to (only a few byte) reads after the
+  actual end of buffers.
+* Calls of `delete[]` (and thus `free()`) of basically arbitrary memory in
+  certain error conditions.
+
+I tried to fix these issues, but make no guarantees of correctness and hope I
+didn't break any valid files.
+
 ### Setup
 
 	git clone https://github.com/panzi/VTFLib.git
